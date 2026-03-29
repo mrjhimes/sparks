@@ -131,6 +131,10 @@
     opacity: 0;
     transform: translateY(20px);
     animation: cardIn 0.5s ease forwards;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
   }
   @keyframes cardIn {
     to { opacity: 1; transform: translateY(0); }
@@ -307,6 +311,8 @@
     filter: brightness(1.1);
     box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px var(--accent-dim);
     border-radius: 3px;
+    -webkit-user-select: none;
+    user-select: none;
   }
   .drop-indicator {
     position: absolute;
