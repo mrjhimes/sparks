@@ -42,13 +42,6 @@
     color: var(--text);
     margin-bottom: 0.3rem;
   }
-  header p {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-  }
   header::after {
     content: '';
     display: block;
@@ -222,10 +215,12 @@
     background: var(--flip-bg);
     border-color: var(--flip-border);
     transform: rotateY(180deg);
-    padding: 1.5rem;
+    padding: 1.2rem;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   .card-back .back-label {
     font-family: 'JetBrains Mono', monospace;
@@ -233,20 +228,22 @@
     letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--accent);
-    margin-bottom: 0.8rem;
+    margin-bottom: 0.6rem;
+    flex-shrink: 0;
   }
   .card-back .back-idea {
-    font-size: 1rem;
-    line-height: 1.65;
+    font-size: 0.88rem;
+    line-height: 1.55;
     color: var(--text);
     font-style: italic;
   }
   .card-back .back-name {
     margin-top: auto;
-    padding-top: 1rem;
-    font-size: 0.8rem;
+    padding-top: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-dim);
     text-align: right;
+    flex-shrink: 0;
   }
 
   /* --- FOCUSED OVERLAY --- */
@@ -294,47 +291,14 @@
     pointer-events: none;
   }
 
-  /* --- DRAG & DROP --- */
-  .card-container {
-    transition: transform 0.3s ease, opacity 0.3s ease;
-  }
-  .card-container.dragging {
-    opacity: 0.3;
-    transform: scale(0.95) !important;
-  }
-  .drag-ghost {
-    position: fixed;
-    z-index: 200;
-    pointer-events: none;
-    opacity: 0.88;
-    transform: rotate(1.5deg) scale(1.05);
-    filter: brightness(1.1);
-    box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px var(--accent-dim);
-    border-radius: 3px;
-    -webkit-user-select: none;
-    user-select: none;
-  }
-  .drop-indicator {
-    position: absolute;
-    top: 0;
-    width: 2px;
-    height: 100%;
-    background: var(--accent);
-    border-radius: 1px;
-    z-index: 10;
-    pointer-events: none;
-    box-shadow: 0 0 8px rgba(196, 149, 106, 0.4);
-  }
-  .grid.drag-active .card-container {
-    animation: none !important;
-    opacity: 1;
-  }
-
   /* --- RESPONSIVE --- */
   @media (max-width: 600px) {
     header h1 { font-size: 1.8rem; }
     .grid { padding: 1.5rem; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
     .card-container { height: 280px; }
+    .card-back { padding: 1rem; }
+    .card-back .back-idea { font-size: 0.78rem; line-height: 1.45; }
+    .card-back .back-name { font-size: 0.65rem; padding-top: 0.5rem; }
     .overlay .focused-card { width: 85vw; height: 70vh; max-width: 340px; max-height: 500px; }
   }
 </style>
@@ -343,7 +307,6 @@
 
 <header>
   <h1>Sparks</h1>
-  <p>Click to flip · Double-click to focus · Drag to reorder</p>
 </header>
 
 <div class="filters">
@@ -1704,25 +1667,50 @@ function createCardHTML(t) {
   `;
 }
 
-// --- DISPLAY ORDER (separate from source data) ---
-let displayOrder = thinkers.map((_, i) => i);
+// --- SORTING HELPERS ---
+
+// Parse a year string like "~369–286 BC", "1844–1900", "~2400 BC" into a sortable number (birth year)
+function parseYear(years) {
+  const s = years.replace(/~/g, '').trim();
+  // grab the first number
+  const m = s.match(/(\d+)/);
+  if (!m) return 0;
+  let y = parseInt(m[1]);
+  // check if BC
+  if (/BC/i.test(s)) y = -y;
+  return y;
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+let displayOrder = shuffle(thinkers.map((_, i) => i));
 let currentRegion = 'all';
 let currentEra = 'all';
 
-// --- DRAG STATE ---
-let dragState = null;
-const DRAG_THRESHOLD = 8;
-
 function getFilteredOrder() {
-  return displayOrder.filter(i => {
+  let filtered = displayOrder.filter(i => {
     const t = thinkers[i];
     const regionMatch = currentRegion === 'all' || t.tag === currentRegion;
     const eraMatch = currentEra === 'all' || t.era === currentEra;
     return regionMatch && eraMatch;
   });
+
+  // Sort chronologically when any filter is active
+  const isFiltered = currentRegion !== 'all' || currentEra !== 'all';
+  if (isFiltered) {
+    filtered.sort((a, b) => parseYear(thinkers[a].years) - parseYear(thinkers[b].years));
+  }
+
+  return filtered;
 }
 
-function renderGrid(animate = true) {
+function renderGrid() {
   grid.innerHTML = '';
   const filtered = getFilteredOrder();
   if (filtered.length === 0) {
@@ -1733,79 +1721,14 @@ function renderGrid(animate = true) {
     const t = thinkers[thinkerIdx];
     const container = document.createElement('div');
     container.className = 'card-container';
-    if (animate) container.style.animationDelay = `${renderIdx * 0.06}s`;
-    else { container.style.opacity = '1'; container.style.transform = 'none'; container.style.animation = 'none'; }
+    container.style.animationDelay = `${renderIdx * 0.06}s`;
     container.dataset.thinkerIndex = thinkerIdx;
     container.innerHTML = createCardHTML(t);
-    grid.appendChild(container);
-  });
-  attachCardListeners();
-}
 
-function attachCardListeners() {
-  grid.querySelectorAll('.card-container').forEach(container => {
     let clickCount = 0;
     let clickTimer = null;
-    let startX, startY, wasDragged;
 
-    // --- POINTER DOWN: start tracking ---
-    container.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return;
-      if (currentRegion !== 'all' || currentEra !== 'all') return; // only reorder in unfiltered view
-      startX = e.clientX;
-      startY = e.clientY;
-      wasDragged = false;
-
-      const thinkerIdx = parseInt(container.dataset.thinkerIndex);
-      const rect = container.getBoundingClientRect();
-
-      dragState = {
-        sourceIndex: thinkerIdx,
-        sourceEl: container,
-        ghostEl: null,
-        startX: e.clientX,
-        startY: e.clientY,
-        offsetX: e.clientX - rect.left,
-        offsetY: e.clientY - rect.top,
-        width: rect.width,
-        height: rect.height,
-        isDragging: false
-      };
-
-      container.setPointerCapture(e.pointerId);
-      e.preventDefault();
-    });
-
-    // --- POINTER MOVE: maybe start drag ---
-    container.addEventListener('pointermove', (e) => {
-      if (!dragState || dragState.sourceEl !== container) return;
-      const dx = e.clientX - dragState.startX;
-      const dy = e.clientY - dragState.startY;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-
-      if (!dragState.isDragging && dist > DRAG_THRESHOLD) {
-        dragState.isDragging = true;
-        wasDragged = true;
-        startDrag(e);
-      }
-
-      if (dragState.isDragging) {
-        moveDrag(e);
-      }
-    });
-
-    // --- POINTER UP: end drag or handle click ---
-    container.addEventListener('pointerup', (e) => {
-      if (dragState && dragState.isDragging && dragState.sourceEl === container) {
-        endDrag(e);
-        dragState = null;
-        return;
-      }
-      dragState = null;
-
-      if (wasDragged) return; // was a drag attempt, don't fire click
-
-      // Click / double-click logic
+    container.addEventListener('click', (e) => {
       e.stopPropagation();
       clickCount++;
       if (clickCount === 1) {
@@ -1816,102 +1739,12 @@ function attachCardListeners() {
       } else if (clickCount === 2) {
         clearTimeout(clickTimer);
         clickCount = 0;
-        openFocused(parseInt(container.dataset.thinkerIndex));
+        openFocused(thinkerIdx);
       }
     });
 
-    // Cancel on pointer leave without up
-    container.addEventListener('pointercancel', () => {
-      if (dragState && dragState.isDragging) cancelDrag();
-      dragState = null;
-    });
+    grid.appendChild(container);
   });
-}
-
-// --- DRAG FUNCTIONS ---
-
-function startDrag(e) {
-  const { sourceEl, offsetX, offsetY, width, height } = dragState;
-
-  // Create ghost
-  const ghost = document.createElement('div');
-  ghost.className = 'drag-ghost';
-  ghost.style.width = width + 'px';
-  ghost.style.height = height + 'px';
-  ghost.innerHTML = sourceEl.innerHTML;
-  ghost.style.left = (e.clientX - offsetX) + 'px';
-  ghost.style.top = (e.clientY - offsetY) + 'px';
-  document.body.appendChild(ghost);
-  dragState.ghostEl = ghost;
-
-  sourceEl.classList.add('dragging');
-  grid.classList.add('drag-active');
-}
-
-function moveDrag(e) {
-  const { ghostEl, offsetX, offsetY } = dragState;
-  ghostEl.style.left = (e.clientX - offsetX) + 'px';
-  ghostEl.style.top = (e.clientY - offsetY) + 'px';
-
-  // Find drop target
-  clearDropIndicators();
-  const target = getDropTarget(e.clientX, e.clientY);
-  if (target && target.el !== dragState.sourceEl) {
-    target.el.style.position = 'relative';
-    const indicator = document.createElement('div');
-    indicator.className = 'drop-indicator';
-    indicator.style[target.side === 'left' ? 'left' : 'right'] = '-4px';
-    target.el.appendChild(indicator);
-  }
-}
-
-function endDrag(e) {
-  const { sourceEl, ghostEl, sourceIndex } = dragState;
-
-  // Find where to drop
-  const target = getDropTarget(e.clientX, e.clientY);
-
-  if (target && target.el !== sourceEl) {
-    const targetThinkerIdx = parseInt(target.el.dataset.thinkerIndex);
-    // Reorder displayOrder
-    const fromPos = displayOrder.indexOf(sourceIndex);
-    displayOrder.splice(fromPos, 1);
-    let toPos = displayOrder.indexOf(targetThinkerIdx);
-    if (target.side === 'right') toPos++;
-    displayOrder.splice(toPos, 0, sourceIndex);
-    renderGrid(false);
-  }
-
-  cleanupDrag();
-}
-
-function cancelDrag() {
-  cleanupDrag();
-}
-
-function cleanupDrag() {
-  if (dragState && dragState.ghostEl) {
-    dragState.ghostEl.remove();
-  }
-  clearDropIndicators();
-  grid.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
-  grid.classList.remove('drag-active');
-}
-
-function clearDropIndicators() {
-  grid.querySelectorAll('.drop-indicator').forEach(el => el.remove());
-}
-
-function getDropTarget(clientX, clientY) {
-  const cards = [...grid.querySelectorAll('.card-container:not(.dragging)')];
-  for (const card of cards) {
-    const rect = card.getBoundingClientRect();
-    if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
-      const midX = rect.left + rect.width / 2;
-      return { el: card, side: clientX < midX ? 'left' : 'right' };
-    }
-  }
-  return null;
 }
 
 // --- FOCUS OVERLAY ---
