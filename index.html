@@ -1,0 +1,1961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sparks — Flashcards</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --card-bg: #141418;
+    --card-border: #2a2a32;
+    --text: #e8e4df;
+    --text-dim: #8a8680;
+    --accent: #c4956a;
+    --accent-dim: #8a6a4a;
+    --flip-bg: #1a1810;
+    --flip-border: #3a3428;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* --- HEADER --- */
+  header {
+    text-align: center;
+    padding: 3rem 2rem 1.5rem;
+    position: relative;
+  }
+  header h1 {
+    font-size: 2.8rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text);
+    margin-bottom: 0.3rem;
+  }
+  header p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  header::after {
+    content: '';
+    display: block;
+    width: 60px;
+    height: 1px;
+    background: var(--accent-dim);
+    margin: 1.5rem auto 0;
+  }
+
+  /* --- FILTER BAR --- */
+  .filters {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 2rem;
+    flex-wrap: wrap;
+  }
+  .filters:first-of-type {
+    padding-top: 1rem;
+  }
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .filter-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    opacity: 0.5;
+    display: flex;
+    align-items: center;
+    padding-right: 0.3rem;
+  }
+  .filter-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--card-border);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 2px;
+  }
+  .filter-btn:hover, .filter-btn.active {
+    color: var(--accent);
+    border-color: var(--accent-dim);
+    background: rgba(196, 149, 106, 0.06);
+  }
+
+  /* --- GRID --- */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.5rem;
+    padding: 2rem 3rem 4rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    transition: opacity 0.4s ease;
+  }
+  .grid.dimmed {
+    opacity: 0.08;
+    pointer-events: none;
+  }
+
+  /* --- CARD --- */
+  .card-container {
+    perspective: 900px;
+    height: 320px;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: cardIn 0.5s ease forwards;
+  }
+  @keyframes cardIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .card.flipped {
+    transform: rotateY(180deg);
+  }
+
+  .card-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border: 1px solid var(--card-border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 3px;
+  }
+
+  /* FRONT */
+  .card-front {
+    background: var(--card-bg);
+  }
+  .card-portrait {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .card-portrait svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .card-portrait .silhouette {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 70%;
+    background: linear-gradient(to top, rgba(20,20,24,0.95) 0%, transparent 100%);
+    z-index: 1;
+  }
+  .card-info {
+    padding: 1rem 1.2rem;
+    position: relative;
+    z-index: 2;
+    background: var(--card-bg);
+    border-top: 1px solid var(--card-border);
+  }
+  .card-name {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+    line-height: 1.2;
+  }
+  .card-years {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+  }
+  .card-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.55rem;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 0.3rem;
+  }
+
+  /* BACK */
+  .card-back {
+    background: var(--flip-bg);
+    border-color: var(--flip-border);
+    transform: rotateY(180deg);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .card-back .back-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.8rem;
+  }
+  .card-back .back-idea {
+    font-size: 1rem;
+    line-height: 1.65;
+    color: var(--text);
+    font-style: italic;
+  }
+  .card-back .back-name {
+    margin-top: auto;
+    padding-top: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-align: right;
+  }
+
+  /* --- FOCUSED OVERLAY --- */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    background: rgba(6, 6, 8, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+  .overlay.visible {
+    display: flex;
+    opacity: 1;
+  }
+  .overlay .focused-card {
+    perspective: 1200px;
+    width: 340px;
+    height: 480px;
+    cursor: pointer;
+  }
+  .overlay .card {
+    width: 100%;
+    height: 100%;
+  }
+  .overlay .card-back .back-idea {
+    font-size: 1.1rem;
+    line-height: 1.75;
+  }
+  .overlay .hint {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+
+  /* --- DRAG & DROP --- */
+  .card-container {
+    transition: transform 0.3s ease, opacity 0.3s ease;
+  }
+  .card-container.dragging {
+    opacity: 0.3;
+    transform: scale(0.95) !important;
+  }
+  .drag-ghost {
+    position: fixed;
+    z-index: 200;
+    pointer-events: none;
+    opacity: 0.88;
+    transform: rotate(1.5deg) scale(1.05);
+    filter: brightness(1.1);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px var(--accent-dim);
+    border-radius: 3px;
+  }
+  .drop-indicator {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 1px;
+    z-index: 10;
+    pointer-events: none;
+    box-shadow: 0 0 8px rgba(196, 149, 106, 0.4);
+  }
+  .grid.drag-active .card-container {
+    animation: none !important;
+    opacity: 1;
+  }
+
+  /* --- RESPONSIVE --- */
+  @media (max-width: 600px) {
+    header h1 { font-size: 1.8rem; }
+    .grid { padding: 1.5rem; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .card-container { height: 280px; }
+    .overlay .focused-card { width: 85vw; height: 70vh; max-width: 340px; max-height: 500px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Sparks</h1>
+  <p>Click to flip · Double-click to focus · Drag to reorder</p>
+</header>
+
+<div class="filters">
+  <span class="filter-label">Region</span>
+  <button class="filter-btn genre-btn active" data-filter="all" data-group="genre">All</button>
+  <button class="filter-btn genre-btn" data-filter="europe" data-group="genre">Europe</button>
+  <button class="filter-btn genre-btn" data-filter="americas" data-group="genre">Americas</button>
+  <button class="filter-btn genre-btn" data-filter="asia" data-group="genre">Asia</button>
+  <button class="filter-btn genre-btn" data-filter="africa-mideast" data-group="genre">Africa & Middle East</button>
+</div>
+<div class="filters">
+  <span class="filter-label">Era</span>
+  <button class="filter-btn era-btn active" data-filter="all" data-group="era">All</button>
+  <button class="filter-btn era-btn" data-filter="ancient" data-group="era">Ancient</button>
+  <button class="filter-btn era-btn" data-filter="medieval" data-group="era">Medieval</button>
+  <button class="filter-btn era-btn" data-filter="19c" data-group="era">19th c.</button>
+  <button class="filter-btn era-btn" data-filter="20c" data-group="era">20th c.</button>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="overlay" id="overlay">
+  <div class="focused-card" id="focusedCard"></div>
+  <div class="hint">click card to flip · esc to close</div>
+</div>
+
+<script>
+// --- SVG PORTRAIT GENERATORS ---
+// Each returns an SVG string — abstract, geometric, evocative of the thinker's ideas
+
+const portraits = {
+  // Nietzsche: jagged mountain peak with a rising spiral — eternal return, the heights
+  nietzsche: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="n1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#8a6a4a" stop-opacity="0.4"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></linearGradient>
+      <linearGradient id="n2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.3"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></linearGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <polygon points="150,40 40,280 260,280" fill="none" stroke="#8a6a4a" stroke-width="1" opacity="0.5"/>
+    <polygon points="150,80 70,260 230,260" fill="url(#n1)" stroke="none"/>
+    <polygon points="150,60 20,300 280,300" fill="none" stroke="#c4956a" stroke-width="0.5" opacity="0.25"/>
+    <path d="M150,260 Q160,200 150,160 Q140,120 155,80" fill="none" stroke="#c4956a" stroke-width="1.5" opacity="0.6"/>
+    <circle cx="155" cy="78" r="3" fill="#c4956a" opacity="0.7"/>
+    <line x1="40" y1="280" x2="260" y2="280" stroke="#8a6a4a" stroke-width="0.5" opacity="0.4"/>
+    <line x1="0" y1="320" x2="300" y2="320" stroke="#2a2a32" stroke-width="0.5"/>
+    <text x="150" y="350" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">ÜBERMENSCH</text>
+  </svg>`,
+
+  // Foucault: panopticon — concentric rings with radiating lines, surveillance
+  foucault: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="f1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.15"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="150" cy="180" r="120" fill="none" stroke="#2a2a32" stroke-width="0.5"/>
+    <circle cx="150" cy="180" r="90" fill="none" stroke="#3a3428" stroke-width="0.5"/>
+    <circle cx="150" cy="180" r="60" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.6"/>
+    <circle cx="150" cy="180" r="30" fill="none" stroke="#8a6a4a" stroke-width="1" opacity="0.7"/>
+    <circle cx="150" cy="180" r="6" fill="#c4956a" opacity="0.5"/>
+    ${[0,30,60,90,120,150,180,210,240,270,300,330].map(a => {
+      const rad = a * Math.PI / 180;
+      return `<line x1="150" y1="180" x2="${150 + 120*Math.cos(rad)}" y2="${180 + 120*Math.sin(rad)}" stroke="#8a6a4a" stroke-width="0.3" opacity="0.3"/>`;
+    }).join('')}
+    <circle cx="150" cy="180" r="100" fill="url(#f1)"/>
+    <text x="150" y="350" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">PANOPTICON</text>
+  </svg>`,
+
+  // Beauvoir: two overlapping forms — self and other, becoming
+  beauvoir: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="b1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.2"/><stop offset="100%" stop-color="#8a6a4a" stop-opacity="0.05"/></linearGradient>
+      <linearGradient id="b2" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.15"/><stop offset="100%" stop-color="#8a6a4a" stop-opacity="0.05"/></linearGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <ellipse cx="120" cy="170" rx="70" ry="100" fill="url(#b1)" stroke="#8a6a4a" stroke-width="0.5" opacity="0.8"/>
+    <ellipse cx="180" cy="190" rx="70" ry="100" fill="url(#b2)" stroke="#c4956a" stroke-width="0.8" opacity="0.6"/>
+    <path d="M140,100 C160,140 160,220 140,270" fill="none" stroke="#c4956a" stroke-width="0.5" opacity="0.4" stroke-dasharray="2,4"/>
+    <circle cx="150" cy="180" r="2" fill="#c4956a" opacity="0.8"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">DEVENIR</text>
+  </svg>`,
+
+  // Fanon: shattered mirror — fractured rectangle, decolonization
+  fanon: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <rect x="80" y="80" width="140" height="200" fill="none" stroke="#8a6a4a" stroke-width="0.8" opacity="0.5"/>
+    <line x1="80" y1="80" x2="160" y2="180" stroke="#c4956a" stroke-width="0.5" opacity="0.6"/>
+    <line x1="220" y1="80" x2="140" y2="200" stroke="#c4956a" stroke-width="0.5" opacity="0.5"/>
+    <line x1="80" y1="280" x2="180" y2="150" stroke="#8a6a4a" stroke-width="0.5" opacity="0.4"/>
+    <line x1="220" y1="280" x2="120" y2="160" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <polygon points="80,80 160,180 80,180" fill="#c4956a" opacity="0.06"/>
+    <polygon points="220,80 160,180 220,160" fill="#8a6a4a" opacity="0.08"/>
+    <polygon points="80,280 140,200 80,200" fill="#c4956a" opacity="0.04"/>
+    <polygon points="220,280 180,150 220,200" fill="#8a6a4a" opacity="0.05"/>
+    <line x1="130" y1="130" x2="190" y2="230" stroke="#c4956a" stroke-width="0.3" opacity="0.5"/>
+    <circle cx="155" cy="175" r="2.5" fill="#c4956a" opacity="0.6"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">RUPTURE</text>
+  </svg>`,
+
+  // Deleuze: rhizome — organic branching network, no center
+  deleuze: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    ${(() => {
+      const nodes = [[90,100],[200,90],[60,180],[150,160],[240,170],[100,240],[180,250],[50,300],[220,290],[150,330],[130,130],[210,210],[80,210],[170,110],[250,250]];
+      const edges = [[0,3],[1,3],[2,3],[3,4],[2,5],[3,6],[5,7],[4,8],[6,9],[0,10],[1,13],[4,11],[2,12],[8,14],[6,11],[10,3],[5,12],[11,8],[13,4],[9,7]];
+      let s = '';
+      edges.forEach(([a,b]) => {
+        const [x1,y1] = nodes[a]; const [x2,y2] = nodes[b];
+        const mx = (x1+x2)/2 + (Math.random()-0.5)*30;
+        const my = (y1+y2)/2 + (Math.random()-0.5)*30;
+        s += `<path d="M${x1},${y1} Q${mx},${my} ${x2},${y2}" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.4"/>`;
+      });
+      nodes.forEach(([x,y], i) => {
+        const r = i === 3 ? 3 : 1.5;
+        s += `<circle cx="${x}" cy="${y}" r="${r}" fill="#c4956a" opacity="${i===3?0.7:0.35}"/>`;
+      });
+      return s;
+    })()}
+    <text x="150" y="378" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">RHIZOME</text>
+  </svg>`,
+
+  // Camus: Sisyphus — circle at top of slope, absurd sun
+  camus: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="c1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.2"/><stop offset="80%" stop-color="#141418" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="150" cy="80" r="50" fill="url(#c1)"/>
+    <circle cx="150" cy="80" r="30" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.5"/>
+    <circle cx="150" cy="80" r="15" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.4"/>
+    <line x1="40" y1="310" x2="260" y2="180" stroke="#8a6a4a" stroke-width="1" opacity="0.4"/>
+    <circle cx="220" cy="200" r="18" fill="none" stroke="#c4956a" stroke-width="1.5" opacity="0.6"/>
+    <circle cx="220" cy="200" r="5" fill="#c4956a" opacity="0.15"/>
+    <path d="M60,300 Q80,290 100,295 Q120,300 130,280" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3" stroke-dasharray="3,3"/>
+    <text x="150" y="355" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">L'ABSURDE</text>
+  </svg>`,
+
+  // Barthes: text as woven threads — horizontal lines dissolving
+  barthes: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    ${Array.from({length: 25}, (_, i) => {
+      const y = 60 + i * 11;
+      const x1 = 40 + Math.sin(i * 0.7) * 20;
+      const x2 = 260 - Math.cos(i * 0.5) * 20;
+      const op = 0.15 + Math.sin(i * 0.4) * 0.15;
+      const sw = 0.3 + Math.sin(i * 0.6) * 0.3;
+      const dash = i > 15 ? `stroke-dasharray="${3 + i%4},${2 + i%3}"` : '';
+      return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${i%3===0?'#c4956a':'#8a6a4a'}" stroke-width="${sw}" opacity="${op}" ${dash}/>`;
+    }).join('')}
+    <line x1="150" y1="50" x2="150" y2="340" stroke="#c4956a" stroke-width="0.3" opacity="0.2"/>
+    <line x1="120" y1="55" x2="120" y2="335" stroke="#8a6a4a" stroke-width="0.3" opacity="0.15"/>
+    <line x1="180" y1="55" x2="180" y2="335" stroke="#8a6a4a" stroke-width="0.3" opacity="0.15"/>
+    <text x="150" y="355" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">TISSU</text>
+  </svg>`,
+
+  // Borges: labyrinth — nested squares spiraling inward
+  borges: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    ${[0,1,2,3,4,5,6].map(i => {
+      const m = 30 + i * 15;
+      const w = 300 - m*2;
+      const h = 280 - m*2;
+      const y = 50 + m;
+      const gap = (i % 4);
+      const op = 0.15 + i * 0.06;
+      let path = '';
+      if (gap === 0) path = `M${m},${y} L${m+w},${y} L${m+w},${y+h} L${m},${y+h}`;
+      else if (gap === 1) path = `M${m+w},${y} L${m+w},${y+h} L${m},${y+h} L${m},${y}`;
+      else if (gap === 2) path = `M${m+w},${y+h} L${m},${y+h} L${m},${y} L${m+w},${y}`;
+      else path = `M${m},${y+h} L${m},${y} L${m+w},${y} L${m+w},${y+h}`;
+      return `<path d="${path}" fill="none" stroke="#8a6a4a" stroke-width="0.6" opacity="${op}"/>`;
+    }).join('')}
+    <circle cx="150" cy="190" r="4" fill="#c4956a" opacity="0.4"/>
+    <circle cx="150" cy="190" r="12" fill="none" stroke="#c4956a" stroke-width="0.5" opacity="0.3"/>
+    <text x="150" y="368" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">LABERINTO</text>
+  </svg>`,
+
+  // Dostoevsky: cross/divide — vertical split, chiaroscuro
+  dostoevsky: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="d1" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#1a1810" stop-opacity="0.8"/><stop offset="50%" stop-color="#141418"/><stop offset="100%" stop-color="#0a0a0c" stop-opacity="0.8"/></linearGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <rect x="0" y="0" width="150" height="400" fill="#1a1810" opacity="0.4"/>
+    <line x1="150" y1="30" x2="150" y2="340" stroke="#c4956a" stroke-width="1" opacity="0.4"/>
+    <line x1="60" y1="180" x2="240" y2="180" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <circle cx="150" cy="180" r="40" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.2"/>
+    <circle cx="150" cy="180" r="3" fill="#c4956a" opacity="0.5"/>
+    <path d="M100,80 Q120,120 110,160" fill="none" stroke="#c4956a" stroke-width="0.4" opacity="0.3"/>
+    <path d="M200,80 Q180,120 190,160" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.3"/>
+    <path d="M100,200 Q120,240 110,280" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2"/>
+    <path d="M200,200 Q180,240 190,280" fill="none" stroke="#c4956a" stroke-width="0.4" opacity="0.2"/>
+    <text x="150" y="368" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">ДВОЙНИК</text>
+  </svg>`,
+
+  // Baldwin: mirror/flame — vertical flame shape, reflection
+  baldwin: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="bl1" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.25"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></linearGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <path d="M150,60 Q170,120 160,160 Q180,200 150,260 Q120,200 140,160 Q130,120 150,60Z" fill="url(#bl1)" stroke="#c4956a" stroke-width="0.8" opacity="0.6"/>
+    <path d="M150,100 Q160,140 155,170 Q165,200 150,230 Q135,200 145,170 Q140,140 150,100Z" fill="none" stroke="#c4956a" stroke-width="0.5" opacity="0.4"/>
+    <line x1="60" y1="280" x2="240" y2="280" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <path d="M150,280 Q170,310 160,330 Q155,340 150,350" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.25" stroke-dasharray="2,3"/>
+    <path d="M150,280 Q130,310 140,330 Q145,340 150,350" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2" stroke-dasharray="2,3"/>
+    <circle cx="150" cy="160" r="2" fill="#c4956a" opacity="0.7"/>
+    <text x="150" y="378" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">WITNESS</text>
+  </svg>`,
+
+  // Butler: seed/spiral — organic adaptation shape, growth
+  butler: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    ${(() => {
+      let s = '';
+      for (let i = 0; i < 200; i++) {
+        const angle = i * 0.15;
+        const r = 3 + i * 0.7;
+        const x = 150 + r * Math.cos(angle);
+        const y = 180 + r * Math.sin(angle);
+        const size = 0.5 + (i/200) * 1.5;
+        const op = 0.1 + (i/200) * 0.3;
+        if (i % 3 === 0) {
+          s += `<circle cx="${x}" cy="${y}" r="${size}" fill="${i%6===0?'#c4956a':'#8a6a4a'}" opacity="${op}"/>`;
+        }
+      }
+      return s;
+    })()}
+    <circle cx="150" cy="180" r="4" fill="#c4956a" opacity="0.4"/>
+    <text x="150" y="368" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">ADAPTATION</text>
+  </svg>`,
+
+  // Ibn Khaldun: wave/cycle — rising and falling arcs
+  khaldun: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="ik1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.1"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></linearGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <path d="M20,250 Q80,80 150,160 Q220,240 280,100" fill="none" stroke="#c4956a" stroke-width="1" opacity="0.5"/>
+    <path d="M20,270 Q80,120 150,190 Q220,260 280,130" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <path d="M20,230 Q80,60 150,140 Q220,220 280,80" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.2"/>
+    <path d="M20,250 Q80,80 150,160 Q220,240 280,100 L280,350 L20,350Z" fill="url(#ik1)"/>
+    ${[60,120,180,240].map(x => `<line x1="${x}" y1="60" x2="${x}" y2="320" stroke="#2a2a32" stroke-width="0.3" opacity="0.4"/>`).join('')}
+    <text x="150" y="368" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">'ASABIYYAH</text>
+  </svg>`,
+
+  // Zhuangzi: butterfly — delicate wing shapes, dream
+  zhuangzi: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="z1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.15"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></linearGradient>
+      <linearGradient id="z2" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.15"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></linearGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <path d="M150,180 Q100,120 60,130 Q30,140 50,180 Q70,220 150,200Z" fill="url(#z1)" stroke="#c4956a" stroke-width="0.6" opacity="0.6"/>
+    <path d="M150,180 Q200,120 240,130 Q270,140 250,180 Q230,220 150,200Z" fill="url(#z2)" stroke="#c4956a" stroke-width="0.6" opacity="0.6"/>
+    <path d="M150,200 Q120,230 100,260 Q90,280 110,270 Q140,250 150,220Z" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.4"/>
+    <path d="M150,200 Q180,230 200,260 Q210,280 190,270 Q160,250 150,220Z" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.4"/>
+    <line x1="150" y1="160" x2="150" y2="290" stroke="#c4956a" stroke-width="0.4" opacity="0.3"/>
+    <circle cx="145" cy="155" r="1.5" fill="#c4956a" opacity="0.5"/>
+    <circle cx="155" cy="155" r="1.5" fill="#c4956a" opacity="0.5"/>
+    <path d="M140,148 Q135,130 130,120" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.4"/>
+    <path d="M160,148 Q165,130 170,120" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.4"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">蝴蝶</text>
+  </svg>`,
+
+  // Tagore: radiant flower/sun — petals radiating outward, creative spirit
+  tagore: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="tg1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.2"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="150" cy="180" r="80" fill="url(#tg1)"/>
+    ${Array.from({length: 16}, (_, i) => {
+      const a = i * (360/16) * Math.PI/180;
+      const x1 = 150 + 25*Math.cos(a);
+      const y1 = 180 + 25*Math.sin(a);
+      const x2 = 150 + 90*Math.cos(a);
+      const y2 = 180 + 90*Math.sin(a);
+      const cx1 = 150 + 60*Math.cos(a + 0.3);
+      const cy1 = 180 + 60*Math.sin(a + 0.3);
+      return `<path d="M${x1},${y1} Q${cx1},${cy1} ${x2},${y2}" fill="none" stroke="${i%2===0?'#c4956a':'#8a6a4a'}" stroke-width="${i%2===0?0.8:0.4}" opacity="${i%2===0?0.4:0.25}"/>`;
+    }).join('')}
+    <circle cx="150" cy="180" r="20" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.35"/>
+    <circle cx="150" cy="180" r="4" fill="#c4956a" opacity="0.45"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">আনন্দ</text>
+  </svg>`,
+
+  // Nishida: empty circle (ensō) — nothingness as place of being
+  nishida: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="nk1"><stop offset="0%" stop-color="#1a1810" stop-opacity="0.3"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="150" cy="180" r="90" fill="url(#nk1)"/>
+    <path d="M150,90 A90,90 0 1,1 148,90" fill="none" stroke="#c4956a" stroke-width="2.5" opacity="0.5" stroke-linecap="round"/>
+    <path d="M146,89 Q140,86 138,90" fill="none" stroke="#c4956a" stroke-width="2" opacity="0.3" stroke-linecap="round"/>
+    <circle cx="150" cy="180" r="2" fill="#8a6a4a" opacity="0.25"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">無</text>
+  </svg>`,
+
+  // Sor Juana: quill and mirror — knowledge and self-reflection, baroque spiral
+  sorjuana: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <ellipse cx="150" cy="170" rx="60" ry="80" fill="none" stroke="#8a6a4a" stroke-width="0.6" opacity="0.4"/>
+    <ellipse cx="150" cy="170" rx="40" ry="55" fill="none" stroke="#c4956a" stroke-width="0.5" opacity="0.3"/>
+    <path d="M150,90 Q165,130 155,170 Q145,210 150,250" fill="none" stroke="#c4956a" stroke-width="1.2" opacity="0.5" stroke-linecap="round"/>
+    <path d="M150,90 Q140,85 135,80" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.4" stroke-linecap="round"/>
+    <path d="M155,170 Q175,165 190,175 Q200,185 190,190" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.35"/>
+    ${[0,1,2,3,4,5].map(i => {
+      const y = 120 + i * 25;
+      return `<line x1="${100 + Math.sin(i)*10}" y1="${y}" x2="${200 - Math.sin(i)*10}" y2="${y}" stroke="#8a6a4a" stroke-width="0.3" opacity="${0.1 + i*0.03}" stroke-dasharray="4,6"/>`;
+    }).join('')}
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">SUEÑO</text>
+  </svg>`,
+
+  // Emerson: radiating eye — the oversoul, transparent eyeball, nature
+  emerson: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="em1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.15"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="150" cy="170" r="70" fill="url(#em1)"/>
+    <ellipse cx="150" cy="170" rx="70" ry="35" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.5"/>
+    <circle cx="150" cy="170" r="18" fill="none" stroke="#c4956a" stroke-width="1" opacity="0.5"/>
+    <circle cx="150" cy="170" r="5" fill="#c4956a" opacity="0.4"/>
+    ${Array.from({length: 12}, (_, i) => {
+      const a = i * 30 * Math.PI/180;
+      return `<line x1="${150+40*Math.cos(a)}" y1="${170+20*Math.sin(a)}" x2="${150+95*Math.cos(a)}" y2="${170+95*Math.sin(a)}" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>`;
+    }).join('')}
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">OVERSOUL</text>
+  </svg>`,
+
+  // Du Bois: veil / double consciousness — two overlapping circles with a line between
+  dubois: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="120" cy="170" r="50" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.4"/>
+    <circle cx="180" cy="170" r="50" fill="none" stroke="#8a6a4a" stroke-width="0.8" opacity="0.4"/>
+    <line x1="150" y1="50" x2="150" y2="300" stroke="#c4956a" stroke-width="0.4" opacity="0.2" stroke-dasharray="1,4"/>
+    <path d="M150,120 Q150,170 150,220" fill="none" stroke="#c4956a" stroke-width="1.5" opacity="0.5"/>
+    <rect x="70" y="140" width="160" height="60" fill="none" stroke="#8a6a4a" stroke-width="0.3" opacity="0.15"/>
+    <line x1="70" y1="170" x2="230" y2="170" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    <circle cx="120" cy="170" r="3" fill="#c4956a" opacity="0.4"/>
+    <circle cx="180" cy="170" r="3" fill="#8a6a4a" opacity="0.4"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">THE VEIL</text>
+  </svg>`,
+
+  // Anzaldúa: borderlands — jagged horizontal line, two landscapes
+  anzaldua: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="az1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.08"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></linearGradient>
+      <linearGradient id="az2" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#8a6a4a" stop-opacity="0.08"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></linearGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <rect x="0" y="0" width="300" height="180" fill="url(#az1)"/>
+    <rect x="0" y="180" width="300" height="220" fill="url(#az2)"/>
+    <path d="M0,180 L30,170 L60,185 L90,165 L120,190 L150,175 L180,195 L210,168 L240,188 L270,172 L300,182" fill="none" stroke="#c4956a" stroke-width="1.5" opacity="0.5"/>
+    <path d="M0,180 L30,170 L60,185 L90,165 L120,190 L150,175 L180,195 L210,168 L240,188 L270,172 L300,182" fill="none" stroke="#c4956a" stroke-width="4" opacity="0.08"/>
+    ${[100,130,220,250].map(y => `<line x1="40" y1="${y}" x2="260" y2="${y}" stroke="#8a6a4a" stroke-width="0.2" opacity="0.15"/>`).join('')}
+    <circle cx="150" cy="180" r="2" fill="#c4956a" opacity="0.6"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">NEPANTLA</text>
+  </svg>`,
+
+  // Confucius: concentric squares — order, ritual, hierarchy
+  confucius: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    ${[0,1,2,3,4].map(i => {
+      const m = 50 + i*20;
+      const s = 300 - m*2;
+      const h = 260 - m*2;
+      return `<rect x="${m}" y="${70+i*20}" width="${s}" height="${h}" fill="none" stroke="${i%2===0?'#c4956a':'#8a6a4a'}" stroke-width="${0.4+i*0.15}" opacity="${0.15+i*0.08}"/>`;
+    }).join('')}
+    <line x1="150" y1="70" x2="150" y2="330" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    <line x1="50" y1="200" x2="250" y2="200" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    <circle cx="150" cy="200" r="4" fill="#c4956a" opacity="0.35"/>
+    <text x="150" y="360" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">仁</text>
+  </svg>`,
+
+  // Dōgen: water ripple — concentric circles from a single point, zazen stillness
+  dogen: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    ${Array.from({length: 8}, (_, i) => {
+      const r = 15 + i * 16;
+      const op = 0.4 - i * 0.04;
+      return `<circle cx="150" cy="180" r="${r}" fill="none" stroke="#c4956a" stroke-width="${0.8 - i*0.06}" opacity="${op}"/>`;
+    }).join('')}
+    <circle cx="150" cy="180" r="2" fill="#c4956a" opacity="0.6"/>
+    <path d="M120,280 L150,260 L180,280" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.25"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">只管打坐</text>
+  </svg>`,
+
+  // Ambedkar: broken chain — links separating, liberation
+  ambedkar: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    ${[0,1,2].map(i => {
+      const x = 60 + i * 35;
+      return `<ellipse cx="${x}" cy="180" rx="18" ry="12" fill="none" stroke="#8a6a4a" stroke-width="0.8" opacity="0.4"/>`;
+    }).join('')}
+    <ellipse cx="180" cy="175" rx="18" ry="12" fill="none" stroke="#c4956a" stroke-width="1" opacity="0.5" transform="rotate(15,180,175)"/>
+    <ellipse cx="220" cy="165" rx="18" ry="12" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.4" transform="rotate(30,220,165)"/>
+    <path d="M200,170 Q210,155 225,150" fill="none" stroke="#c4956a" stroke-width="0.5" opacity="0.3" stroke-dasharray="2,3"/>
+    <line x1="165" y1="180" x2="195" y2="170" stroke="#c4956a" stroke-width="0.4" opacity="0.3" stroke-dasharray="2,4"/>
+    ${Array.from({length: 5}, (_, i) => {
+      const x = 190 + Math.random()*60;
+      const y = 140 + Math.random()*50;
+      return `<circle cx="${x}" cy="${y}" r="0.8" fill="#c4956a" opacity="${0.2+Math.random()*0.3}"/>`;
+    }).join('')}
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">LIBERTY</text>
+  </svg>`,
+
+  // Nagarjuna: emptiness — fading nested circles, śūnyatā
+  nagarjuna: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    ${Array.from({length: 6}, (_, i) => {
+      const r = 20 + i * 18;
+      return `<circle cx="150" cy="180" r="${r}" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="${0.35 - i*0.05}" stroke-dasharray="${2+i*2},${3+i*2}"/>`;
+    }).join('')}
+    <circle cx="150" cy="180" r="8" fill="none" stroke="#c4956a" stroke-width="1" opacity="0.5"/>
+    <circle cx="150" cy="180" r="0" fill="#c4956a" opacity="0"/>
+    <path d="M130,160 Q150,150 170,160" fill="none" stroke="#c4956a" stroke-width="0.4" opacity="0.3"/>
+    <path d="M130,200 Q150,210 170,200" fill="none" stroke="#c4956a" stroke-width="0.4" opacity="0.3"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">शून्यता</text>
+  </svg>`,
+
+  // Ptahhotep: horizontal stacked lines — wisdom maxims, papyrus layers
+  ptahhotep: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    ${Array.from({length: 14}, (_, i) => {
+      const y = 80 + i * 18;
+      const x1 = 60 + (i%3) * 8;
+      const x2 = 240 - (i%4) * 10;
+      const op = 0.12 + Math.sin(i*0.5) * 0.08;
+      return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${i<4?'#c4956a':'#8a6a4a'}" stroke-width="${i<3?0.8:0.4}" opacity="${op + (i<3?0.15:0)}"/>`;
+    }).join('')}
+    <polygon points="140,60 150,45 160,60" fill="none" stroke="#c4956a" stroke-width="0.6" opacity="0.4"/>
+    <line x1="150" y1="60" x2="150" y2="75" stroke="#c4956a" stroke-width="0.4" opacity="0.3"/>
+    <rect x="80" y="70" width="140" height="250" fill="none" stroke="#8a6a4a" stroke-width="0.3" opacity="0.1"/>
+    <text x="150" y="358" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">MAXIMS</text>
+  </svg>`,
+
+  // Rumi: whirling spiral — Sufi spin, love as cosmic force
+  rumi: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="ru1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.12"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="150" cy="180" r="100" fill="url(#ru1)"/>
+    ${(() => {
+      let s = '';
+      for (let i = 0; i < 300; i++) {
+        const angle = i * 0.08;
+        const r = 5 + i * 0.35;
+        const x = 150 + r * Math.cos(angle);
+        const y = 180 + r * Math.sin(angle);
+        if (i % 4 === 0) {
+          s += `<circle cx="${x}" cy="${y}" r="${0.3 + (i/300)*1}" fill="#c4956a" opacity="${0.1 + (i/300)*0.35}"/>`;
+        }
+      }
+      return s;
+    })()}
+    <circle cx="150" cy="180" r="3" fill="#c4956a" opacity="0.5"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">عشق</text>
+  </svg>`,
+
+  // Al-Ghazali: lamp in a niche — light of faith, Mishkat al-Anwar
+  ghazali: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="gh1" cx="50%" cy="40%"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.2"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <path d="M110,60 L110,280 Q110,310 150,310 Q190,310 190,280 L190,60" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <path d="M120,70 L120,270 Q120,295 150,295 Q180,295 180,270 L180,70" fill="none" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    <circle cx="150" cy="160" r="40" fill="url(#gh1)"/>
+    <circle cx="150" cy="160" r="20" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.4"/>
+    <circle cx="150" cy="160" r="5" fill="#c4956a" opacity="0.45"/>
+    ${[0,60,120,180,240,300].map(a => {
+      const rad = a * Math.PI/180;
+      return `<line x1="${150+22*Math.cos(rad)}" y1="${160+22*Math.sin(rad)}" x2="${150+38*Math.cos(rad)}" y2="${160+38*Math.sin(rad)}" stroke="#c4956a" stroke-width="0.3" opacity="0.25"/>`;
+    }).join('')}
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">مشكاة</text>
+  </svg>`,
+
+  // Achebe: intertwined roots — things falling apart, cultural roots holding
+  achebe: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <path d="M150,80 L150,180" stroke="#c4956a" stroke-width="1.2" opacity="0.5"/>
+    <path d="M150,180 Q120,220 90,270" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.4"/>
+    <path d="M150,180 Q180,220 210,270" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.4"/>
+    <path d="M150,180 Q140,230 150,280" fill="none" stroke="#8a6a4a" stroke-width="0.6" opacity="0.35"/>
+    <path d="M150,180 Q100,200 70,230" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <path d="M150,180 Q200,200 230,230" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <path d="M90,270 Q80,280 85,300" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.25"/>
+    <path d="M210,270 Q220,280 215,300" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.25"/>
+    <path d="M70,230 Q55,245 60,260" fill="none" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    <path d="M230,230 Q245,245 240,260" fill="none" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    <circle cx="150" cy="130" r="15" fill="none" stroke="#c4956a" stroke-width="0.5" opacity="0.25" stroke-dasharray="2,3"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">ROOTS</text>
+  </svg>`,
+
+  // Biko: rising fist / ascending form — black consciousness, emergence
+  biko: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="bk1" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#141418"/><stop offset="100%" stop-color="#c4956a" stop-opacity="0.15"/></linearGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <rect x="130" y="120" width="40" height="180" fill="url(#bk1)" stroke="none"/>
+    <rect x="130" y="120" width="40" height="180" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.4"/>
+    <line x1="150" y1="120" x2="150" y2="60" stroke="#c4956a" stroke-width="1.5" opacity="0.5"/>
+    <path d="M135,60 L150,40 L165,60" fill="none" stroke="#c4956a" stroke-width="1" opacity="0.5"/>
+    <line x1="100" y1="200" x2="130" y2="200" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <line x1="170" y1="200" x2="200" y2="200" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <line x1="110" y1="240" x2="130" y2="240" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2"/>
+    <line x1="170" y1="240" x2="190" y2="240" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">CONSCIOUSNESS</text>
+  </svg>`,
+
+  // Ngugi: pen crossing out one language, writing another — decolonizing the mind
+  ngugi: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    ${Array.from({length: 6}, (_, i) => {
+      const y = 90 + i * 25;
+      return `<line x1="70" y1="${y}" x2="230" y2="${y}" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2"/>
+              <line x1="75" y1="${y}" x2="225" y2="${y}" stroke="#c4956a" stroke-width="0.3" opacity="0.15" stroke-dasharray="8,12" stroke-dashoffset="${i*7}"/>`;
+    }).join('')}
+    <line x1="60" y1="70" x2="240" y2="240" stroke="#c4956a" stroke-width="0.8" opacity="0.35"/>
+    <line x1="240" y1="70" x2="60" y2="240" stroke="#c4956a" stroke-width="0.8" opacity="0.35"/>
+    ${Array.from({length: 5}, (_, i) => {
+      const y = 250 + i * 18;
+      return `<line x1="80" y1="${y}" x2="220" y2="${y}" stroke="#c4956a" stroke-width="0.5" opacity="${0.25 + i*0.04}"/>`;
+    }).join('')}
+    <text x="150" y="368" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">LUGHA</text>
+  </svg>`,
+
+  // Arendt: table between people — the public realm, space of appearance
+  arendt: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <rect x="80" y="160" width="140" height="6" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.5"/>
+    <rect x="80" y="160" width="140" height="6" fill="#c4956a" opacity="0.06"/>
+    <line x1="90" y1="166" x2="90" y2="260" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <line x1="210" y1="166" x2="210" y2="260" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    ${[[110,130],[140,125],[170,128],[200,132],[120,190],[150,195],[180,192]].map(([x,y], i) => 
+      `<circle cx="${x}" cy="${y}" r="${i<4?4:4}" fill="none" stroke="${i<4?'#c4956a':'#8a6a4a'}" stroke-width="0.6" opacity="${i<4?0.4:0.3}"/>
+       <line x1="${x}" y1="${y+4}" x2="${x}" y2="160" stroke="#8a6a4a" stroke-width="0.2" opacity="0.15"/>`
+    ).join('')}
+    <circle cx="150" cy="163" r="2" fill="#c4956a" opacity="0.4"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">VITA ACTIVA</text>
+  </svg>`,
+
+  // Simone Weil: gravity and grace — weight pulling down, light pulling up
+  weil: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="sw1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.12"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></linearGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <line x1="150" y1="50" x2="150" y2="320" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2"/>
+    <path d="M150,170 L120,200 L150,195 L180,200Z" fill="url(#sw1)" stroke="#c4956a" stroke-width="0.6" opacity="0.5"/>
+    <path d="M150,170 Q145,140 150,110 Q155,80 150,60" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.4" stroke-dasharray="2,4"/>
+    <path d="M150,195 Q148,230 150,260 Q152,290 150,310" fill="none" stroke="#8a6a4a" stroke-width="1" opacity="0.4"/>
+    <circle cx="150" cy="310" r="6" fill="none" stroke="#8a6a4a" stroke-width="0.6" opacity="0.3"/>
+    <circle cx="150" cy="60" r="8" fill="none" stroke="#c4956a" stroke-width="0.5" opacity="0.3"/>
+    <circle cx="150" cy="60" r="2" fill="#c4956a" opacity="0.3"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">PESANTEUR</text>
+  </svg>`,
+
+  // bell hooks: overlapping circles — love, community, intersecting oppressions
+  hooks: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="130" cy="155" r="45" fill="none" stroke="#c4956a" stroke-width="0.7" opacity="0.4"/>
+    <circle cx="170" cy="155" r="45" fill="none" stroke="#c4956a" stroke-width="0.7" opacity="0.4"/>
+    <circle cx="150" cy="190" r="45" fill="none" stroke="#8a6a4a" stroke-width="0.7" opacity="0.35"/>
+    <circle cx="130" cy="155" r="45" fill="#c4956a" opacity="0.03"/>
+    <circle cx="170" cy="155" r="45" fill="#c4956a" opacity="0.03"/>
+    <circle cx="150" cy="190" r="45" fill="#8a6a4a" opacity="0.03"/>
+    <circle cx="150" cy="168" r="3" fill="#c4956a" opacity="0.5"/>
+    <path d="M150,168 Q130,220 110,260" fill="none" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    <path d="M150,168 Q170,220 190,260" fill="none" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">ALL ABOUT LOVE</text>
+  </svg>`,
+
+  // Murasaki Shikibu: flowing brushstroke — tale of genji, narrative layers
+  shikibu: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <path d="M80,80 Q120,100 140,160 Q155,210 150,260 Q145,300 160,330" fill="none" stroke="#c4956a" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+    <path d="M100,90 Q130,120 145,170 Q158,220 155,265" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.25" stroke-linecap="round"/>
+    <path d="M170,100 Q160,140 165,180 Q175,230 165,280" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.25"/>
+    <path d="M190,110 Q180,160 185,200 Q190,250 180,290" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2"/>
+    <path d="M210,120 Q200,170 205,220 Q210,260 200,300" fill="none" stroke="#8a6a4a" stroke-width="0.3" opacity="0.15"/>
+    ${[120,150,180,210,240].map(y => 
+      `<circle cx="${140 + Math.sin(y*0.03)*15}" cy="${y}" r="0.8" fill="#c4956a" opacity="0.3"/>`
+    ).join('')}
+    <text x="150" y="368" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">物語</text>
+  </svg>`,
+
+  // Nawal El Saadawi: broken veil/cage — feminist revolt, unmasking patriarchy
+  saadawi: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    ${Array.from({length: 7}, (_, i) => {
+      const x = 90 + i * 20;
+      return `<line x1="${x}" y1="80" x2="${x}" y2="280" stroke="#8a6a4a" stroke-width="0.5" opacity="0.25"/>`;
+    }).join('')}
+    ${Array.from({length: 8}, (_, i) => {
+      const y = 80 + i * 28;
+      return `<line x1="90" y1="${y}" x2="210" y2="${y}" stroke="#8a6a4a" stroke-width="0.5" opacity="0.2"/>`;
+    }).join('')}
+    <line x1="90" y1="80" x2="210" y2="280" stroke="#c4956a" stroke-width="1.2" opacity="0.5"/>
+    <line x1="210" y1="80" x2="90" y2="280" stroke="#c4956a" stroke-width="1.2" opacity="0.5"/>
+    <path d="M120,140 Q150,120 180,140" fill="none" stroke="#c4956a" stroke-width="0.6" opacity="0.4"/>
+    <circle cx="150" cy="180" r="3" fill="#c4956a" opacity="0.5"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">ثورة</text>
+  </svg>`,
+
+  // Rābiʿa: single flame in darkness — pure love of God, no fear no hope
+  rabia: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="ra1" cx="50%" cy="45%"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.18"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="150" cy="165" r="60" fill="url(#ra1)"/>
+    <path d="M150,120 Q158,145 155,165 Q162,185 150,210 Q138,185 145,165 Q142,145 150,120Z" fill="#c4956a" opacity="0.1" stroke="#c4956a" stroke-width="0.6" opacity="0.5"/>
+    <path d="M150,140 Q154,155 152,165 Q156,178 150,192 Q144,178 148,165 Q146,155 150,140Z" fill="#c4956a" opacity="0.06" stroke="#c4956a" stroke-width="0.4" opacity="0.35"/>
+    <circle cx="150" cy="165" r="2.5" fill="#c4956a" opacity="0.5"/>
+    <line x1="150" y1="210" x2="150" y2="280" stroke="#8a6a4a" stroke-width="0.5" opacity="0.2"/>
+    <line x1="130" y1="280" x2="170" y2="280" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">حُبّ</text>
+  </svg>`,
+
+  // Socrates: hemlock cup and question mark — the examined life
+  socrates: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <path d="M130,200 Q130,160 150,150 Q170,140 175,160 Q180,180 150,190" fill="none" stroke="#c4956a" stroke-width="1.2" opacity="0.5" stroke-linecap="round"/>
+    <circle cx="150" cy="210" r="2" fill="#c4956a" opacity="0.5"/>
+    <path d="M120,260 L120,280 Q120,295 150,295 Q180,295 180,280 L180,260" fill="none" stroke="#8a6a4a" stroke-width="0.6" opacity="0.35"/>
+    <line x1="115" y1="260" x2="185" y2="260" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <ellipse cx="150" cy="256" rx="25" ry="4" fill="none" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">ΓΝΩΘΙ ΣΑΥΤΟΝ</text>
+  </svg>`,
+
+  // Plato: cave with light shaft — the allegory of the cave
+  plato: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="pl1" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.2"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></linearGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <path d="M220,50 L130,170 L170,170Z" fill="url(#pl1)" stroke="none"/>
+    <path d="M220,50 L130,170" stroke="#c4956a" stroke-width="0.5" opacity="0.4"/>
+    <path d="M220,50 L170,170" stroke="#c4956a" stroke-width="0.5" opacity="0.4"/>
+    <path d="M60,150 Q60,120 80,110 L80,300 Q60,300 60,280Z" fill="#1a1810" stroke="#8a6a4a" stroke-width="0.4" opacity="0.3"/>
+    <path d="M80,110 L230,110 Q240,120 240,150 L240,280 Q240,300 230,300 L80,300Z" fill="none" stroke="#8a6a4a" stroke-width="0.3" opacity="0.15"/>
+    ${[160,185,210,235,260].map(y => `<rect x="100" y="${y}" width="15" height="20" fill="none" stroke="#8a6a4a" stroke-width="0.3" opacity="${0.1 + (y-160)*0.002}"/>`).join('')}
+    <circle cx="150" cy="170" r="3" fill="#c4956a" opacity="0.35"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">ΕΙΔΟΣ</text>
+  </svg>`,
+
+  // Aristotle: branching tree — categories, taxonomy, the golden mean
+  aristotle: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <line x1="150" y1="280" x2="150" y2="180" stroke="#c4956a" stroke-width="1" opacity="0.5"/>
+    <line x1="150" y1="180" x2="100" y2="130" stroke="#c4956a" stroke-width="0.7" opacity="0.4"/>
+    <line x1="150" y1="180" x2="200" y2="130" stroke="#c4956a" stroke-width="0.7" opacity="0.4"/>
+    <line x1="100" y1="130" x2="75" y2="95" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <line x1="100" y1="130" x2="110" y2="90" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <line x1="200" y1="130" x2="190" y2="90" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <line x1="200" y1="130" x2="225" y2="95" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    ${[[75,95],[110,90],[190,90],[225,95],[100,130],[200,130],[150,180]].map(([x,y]) =>
+      `<circle cx="${x}" cy="${y}" r="3" fill="none" stroke="#c4956a" stroke-width="0.5" opacity="0.35"/>`
+    ).join('')}
+    <line x1="80" y1="280" x2="220" y2="280" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">ΤΕΛΟΣ</text>
+  </svg>`,
+
+  // Hildegard: mandala/cosmos — viriditas, living green, cosmic visions
+  hildegard: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="hg1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.15"/><stop offset="70%" stop-color="#141418" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="150" cy="180" r="80" fill="url(#hg1)"/>
+    <circle cx="150" cy="180" r="80" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <circle cx="150" cy="180" r="55" fill="none" stroke="#c4956a" stroke-width="0.5" opacity="0.3"/>
+    <circle cx="150" cy="180" r="30" fill="none" stroke="#c4956a" stroke-width="0.6" opacity="0.35"/>
+    ${Array.from({length: 8}, (_, i) => {
+      const a = i * 45 * Math.PI / 180;
+      const x1 = 150 + 30 * Math.cos(a), y1 = 180 + 30 * Math.sin(a);
+      const x2 = 150 + 55 * Math.cos(a), y2 = 180 + 55 * Math.sin(a);
+      const cx1 = 150 + 45 * Math.cos(a + 0.4), cy1 = 180 + 45 * Math.sin(a + 0.4);
+      return `<path d="M${x1},${y1} Q${cx1},${cy1} ${x2},${y2}" fill="none" stroke="#c4956a" stroke-width="0.5" opacity="0.3"/>`;
+    }).join('')}
+    ${Array.from({length: 8}, (_, i) => {
+      const a = (i * 45 + 22.5) * Math.PI / 180;
+      const x = 150 + 42 * Math.cos(a), y = 180 + 42 * Math.sin(a);
+      return `<circle cx="${x}" cy="${y}" r="1.5" fill="#c4956a" opacity="0.3"/>`;
+    }).join('')}
+    <circle cx="150" cy="180" r="5" fill="#c4956a" opacity="0.3"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">VIRIDITAS</text>
+  </svg>`,
+
+  // Aquinas: ascending steps/ladder — summa, five ways, rational ascent to God
+  aquinas: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    ${Array.from({length: 7}, (_, i) => {
+      const y = 280 - i * 32;
+      const w = 160 - i * 16;
+      const x = 150 - w/2;
+      return `<rect x="${x}" y="${y}" width="${w}" height="28" fill="none" stroke="${i===6?'#c4956a':'#8a6a4a'}" stroke-width="${i===6?0.8:0.5}" opacity="${0.15 + i*0.05}"/>
+              <rect x="${x}" y="${y}" width="${w}" height="28" fill="#c4956a" opacity="${0.01 + i*0.008}"/>`;
+    }).join('')}
+    <circle cx="150" cy="52" r="4" fill="#c4956a" opacity="0.35"/>
+    <line x1="150" y1="56" x2="150" y2="68" stroke="#c4956a" stroke-width="0.4" opacity="0.3"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">SUMMA</text>
+  </svg>`,
+
+  // Christine de Pizan: city of ladies — towers rising, constructed refuge
+  pizan: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <line x1="60" y1="280" x2="240" y2="280" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    ${[[90,140,25],[130,110,20],[165,90,22],[200,120,18],[145,160,24]].map(([x,h,w]) =>
+      `<rect x="${x-w/2}" y="${280-h}" width="${w}" height="${h}" fill="none" stroke="#c4956a" stroke-width="0.5" opacity="0.35"/>
+       <rect x="${x-w/2}" y="${280-h}" width="${w}" height="${h}" fill="#c4956a" opacity="0.03"/>
+       <rect x="${x-3}" y="${280-h-8}" width="6" height="8" fill="none" stroke="#c4956a" stroke-width="0.4" opacity="0.25"/>`
+    ).join('')}
+    <path d="M70,280 Q70,290 80,290 L220,290 Q230,290 230,280" fill="none" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">CITÉ DES DAMES</text>
+  </svg>`,
+
+  // Wollstonecraft: broken chain becoming wings — vindication, liberation
+  wollstonecraft: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <path d="M150,180 Q120,150 90,160 Q65,170 70,190 Q75,210 100,200 Q125,190 150,180Z" fill="none" stroke="#c4956a" stroke-width="0.7" opacity="0.4"/>
+    <path d="M150,180 Q180,150 210,160 Q235,170 230,190 Q225,210 200,200 Q175,190 150,180Z" fill="none" stroke="#c4956a" stroke-width="0.7" opacity="0.4"/>
+    <path d="M150,180 Q115,140 80,145 Q55,150 60,175" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.25"/>
+    <path d="M150,180 Q185,140 220,145 Q245,150 240,175" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.25"/>
+    <circle cx="150" cy="180" r="3" fill="#c4956a" opacity="0.4"/>
+    <line x1="140" y1="220" x2="130" y2="260" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2" stroke-dasharray="3,4"/>
+    <line x1="160" y1="220" x2="170" y2="260" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2" stroke-dasharray="3,4"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">VINDICATION</text>
+  </svg>`,
+
+  // Marx: base and superstructure — layers, foundation determines the rest
+  marx: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="mx1" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.1"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></linearGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <rect x="60" y="210" width="180" height="70" fill="url(#mx1)" stroke="#c4956a" stroke-width="0.8" opacity="0.45"/>
+    <rect x="80" y="140" width="140" height="65" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <rect x="100" y="90" width="100" height="45" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2"/>
+    <rect x="120" y="60" width="60" height="25" fill="none" stroke="#8a6a4a" stroke-width="0.3" opacity="0.15"/>
+    <line x1="60" y1="210" x2="240" y2="210" stroke="#c4956a" stroke-width="0.8" opacity="0.4"/>
+    ${[170,185,200].map(y => `<line x1="80" y1="${y}" x2="220" y2="${y}" stroke="#8a6a4a" stroke-width="0.3" opacity="0.15"/>`).join('')}
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">GRUNDRISSE</text>
+  </svg>`,
+
+  // Mirabai: devotional flame dancing — bhakti, ecstatic love
+  mirabai: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="mi1"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.12"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="150" cy="175" r="70" fill="url(#mi1)"/>
+    ${(() => {
+      let s = '';
+      for (let i = 0; i < 5; i++) {
+        const cx = 150 + Math.sin(i * 1.3) * 20;
+        const h = 40 + i * 12;
+        const y = 200 - h;
+        s += `<path d="M${cx},${200} Q${cx+8},${200-h*0.6} ${cx},${y} Q${cx-8},${200-h*0.6} ${cx},${200}Z" fill="none" stroke="#c4956a" stroke-width="${0.4+i*0.15}" opacity="${0.2+i*0.06}"/>`;
+      }
+      return s;
+    })()}
+    <path d="M130,230 Q140,225 150,228 Q160,225 170,230" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.25"/>
+    <path d="M120,250 Q135,245 150,248 Q165,245 180,250" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2"/>
+    <circle cx="150" cy="165" r="2" fill="#c4956a" opacity="0.5"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">भक्ति</text>
+  </svg>`,
+
+  // Vivekananda: radiating Om — universal consciousness, bridging East and West
+  vivekananda: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="150" cy="175" r="60" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.25"/>
+    <circle cx="150" cy="175" r="40" fill="none" stroke="#c4956a" stroke-width="0.5" opacity="0.3"/>
+    ${Array.from({length: 6}, (_, i) => {
+      const a = i * 60 * Math.PI/180;
+      return `<line x1="${150+42*Math.cos(a)}" y1="${175+42*Math.sin(a)}" x2="${150+62*Math.cos(a)}" y2="${175+62*Math.sin(a)}" stroke="#c4956a" stroke-width="0.6" opacity="0.25"/>
+              <circle cx="${150+68*Math.cos(a)}" cy="${175+68*Math.sin(a)}" r="1.5" fill="#c4956a" opacity="0.3"/>`;
+    }).join('')}
+    <path d="M140,170 Q145,160 150,165 Q155,170 148,178 Q142,185 155,185" fill="none" stroke="#c4956a" stroke-width="1" opacity="0.45" stroke-linecap="round"/>
+    <circle cx="152" cy="155" r="2" fill="#c4956a" opacity="0.35"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">वेदान्त</text>
+  </svg>`,
+
+  // Spivak: palimpsest — layered erased text, the subaltern's silenced voice
+  spivak: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    ${Array.from({length: 10}, (_, i) => {
+      const y = 80 + i * 22;
+      const op = i < 5 ? 0.08 + i * 0.01 : 0.18 - (i-5) * 0.02;
+      return `<line x1="${65+i%3*5}" y1="${y}" x2="${235-i%4*8}" y2="${y}" stroke="#8a6a4a" stroke-width="0.4" opacity="${op}" stroke-dasharray="${4+i%3},${8-i%2}"/>`;
+    }).join('')}
+    ${Array.from({length: 8}, (_, i) => {
+      const y = 90 + i * 22;
+      return `<line x1="${70+i%2*10}" y1="${y}" x2="${230-i%3*10}" y2="${y}" stroke="#c4956a" stroke-width="0.3" opacity="0.06"/>`;
+    }).join('')}
+    <rect x="80" y="150" width="140" height="60" fill="none" stroke="#c4956a" stroke-width="0.6" opacity="0.3"/>
+    <line x1="90" y1="165" x2="210" y2="165" stroke="#c4956a" stroke-width="0.4" opacity="0.15"/>
+    <line x1="90" y1="180" x2="200" y2="180" stroke="#c4956a" stroke-width="0.4" opacity="0.12"/>
+    <line x1="90" y1="195" x2="180" y2="195" stroke="#c4956a" stroke-width="0.4" opacity="0.1"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">SUBALTERN</text>
+  </svg>`,
+
+  // Nishitani: void with horizon — religion and nothingness, śūnyatā meets nihilism
+  nishitani: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="nt1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#141418"/><stop offset="50%" stop-color="#1a1810" stop-opacity="0.5"/><stop offset="100%" stop-color="#141418"/></linearGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <rect x="0" y="160" width="300" height="2" fill="url(#nt1)"/>
+    <line x1="30" y1="180" x2="270" y2="180" stroke="#c4956a" stroke-width="0.6" opacity="0.35"/>
+    <circle cx="150" cy="180" r="50" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.2" stroke-dasharray="3,5"/>
+    <circle cx="150" cy="180" r="25" fill="none" stroke="#c4956a" stroke-width="0.4" opacity="0.25" stroke-dasharray="2,4"/>
+    <circle cx="150" cy="180" r="2" fill="#c4956a" opacity="0.3"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">空</text>
+  </svg>`,
+
+  // Imhotep: pyramid/column — architecture, medicine, first polymath
+  imhotep: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="im1" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#c4956a" stop-opacity="0.08"/><stop offset="100%" stop-color="#141418" stop-opacity="0"/></linearGradient>
+    </defs>
+    <rect width="300" height="400" fill="#141418"/>
+    <polygon points="150,70 80,280 220,280" fill="url(#im1)" stroke="#c4956a" stroke-width="0.7" opacity="0.4"/>
+    ${[130,170,210,250].map(y => {
+      const t = (y-70)/210;
+      const x1 = 150 - t*70, x2 = 150 + t*70;
+      return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>`;
+    }).join('')}
+    <circle cx="150" cy="120" r="3" fill="#c4956a" opacity="0.3"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">ARCHITECT</text>
+  </svg>`,
+
+  // Hypatia: astrolabe — circles and angles, mathematics, stargazing
+  hypatia: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="150" cy="175" r="75" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <circle cx="150" cy="175" r="55" fill="none" stroke="#c4956a" stroke-width="0.4" opacity="0.25"/>
+    <ellipse cx="150" cy="175" rx="75" ry="30" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2" transform="rotate(25,150,175)"/>
+    <ellipse cx="150" cy="175" rx="75" ry="30" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.2" transform="rotate(-25,150,175)"/>
+    <line x1="150" y1="95" x2="150" y2="255" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    <line x1="70" y1="175" x2="230" y2="175" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    ${[[120,130],[180,140],[130,210],[175,215],[150,175]].map(([x,y]) =>
+      `<circle cx="${x}" cy="${y}" r="1.5" fill="#c4956a" opacity="0.35"/>`
+    ).join('')}
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">ΑΣΤΡΟΛΑΒΟΣ</text>
+  </svg>`,
+
+  // Al-Afghani: rising crescent — Islamic modernism, awakening
+  afghani: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <path d="M180,120 A60,60 0 1,0 180,240" fill="none" stroke="#c4956a" stroke-width="0.8" opacity="0.45"/>
+    <path d="M180,140 A45,45 0 1,0 180,220" fill="#141418" stroke="none"/>
+    <path d="M180,140 A45,45 0 1,0 180,220" fill="none" stroke="#8a6a4a" stroke-width="0.4" opacity="0.25"/>
+    <circle cx="192" cy="125" r="3" fill="#c4956a" opacity="0.35"/>
+    ${Array.from({length: 5}, (_, i) => {
+      const a = (-60 + i * 30) * Math.PI / 180;
+      const x = 135 + 80 * Math.cos(a), y = 180 + 80 * Math.sin(a);
+      return `<circle cx="${x}" cy="${y}" r="1" fill="#8a6a4a" opacity="0.2"/>`;
+    }).join('')}
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">نهضة</text>
+  </svg>`,
+
+  // Blyden: map/compass — Pan-Africanism, charting a new identity
+  blyden: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <circle cx="150" cy="175" r="70" fill="none" stroke="#8a6a4a" stroke-width="0.5" opacity="0.3"/>
+    <line x1="150" y1="100" x2="150" y2="250" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    <line x1="75" y1="175" x2="225" y2="175" stroke="#8a6a4a" stroke-width="0.3" opacity="0.2"/>
+    <polygon points="150,110 145,170 150,160 155,170" fill="#c4956a" opacity="0.3" stroke="#c4956a" stroke-width="0.4" opacity="0.5"/>
+    <polygon points="150,240 145,180 150,190 155,180" fill="#8a6a4a" opacity="0.15" stroke="#8a6a4a" stroke-width="0.3" opacity="0.3"/>
+    <polygon points="85,175 145,170 140,175 145,180" fill="#8a6a4a" opacity="0.1" stroke="#8a6a4a" stroke-width="0.3" opacity="0.25"/>
+    <polygon points="215,175 155,170 160,175 155,180" fill="#8a6a4a" opacity="0.1" stroke="#8a6a4a" stroke-width="0.3" opacity="0.25"/>
+    <circle cx="150" cy="175" r="3" fill="#c4956a" opacity="0.35"/>
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">REPATRIATION</text>
+  </svg>`,
+
+  // Nana Asma'u: radiating pen — Sufi scholar, women's education networks
+  asmau: () => `<svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="400" fill="#141418"/>
+    <line x1="150" y1="80" x2="150" y2="260" stroke="#c4956a" stroke-width="1" opacity="0.45" stroke-linecap="round"/>
+    <path d="M150,80 L146,90 L150,85 L154,90Z" fill="#c4956a" opacity="0.4"/>
+    ${Array.from({length: 7}, (_, i) => {
+      const y = 120 + i * 20;
+      const spread = 10 + i * 8;
+      return `<line x1="${150-spread}" y1="${y}" x2="${150+spread}" y2="${y}" stroke="#8a6a4a" stroke-width="0.4" opacity="${0.12+i*0.02}" stroke-dasharray="3,5"/>`;
+    }).join('')}
+    ${Array.from({length: 5}, (_, i) => {
+      const a = (-40 + i * 20) * Math.PI/180;
+      const x = 150 + 90 * Math.cos(a - Math.PI/2);
+      const y = 170 + 90 * Math.sin(a - Math.PI/2);
+      return `<circle cx="${x}" cy="${y}" r="1.5" fill="#c4956a" opacity="0.25"/>`;
+    }).join('')}
+    <text x="150" y="348" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7" fill="#8a6a4a" letter-spacing="0.3em" opacity="0.5">YAN-TARU</text>
+  </svg>`
+};
+
+const thinkers = [
+  {
+    name: "Friedrich Nietzsche",
+    years: "1844–1900",
+    tag: "europe",
+    era: "19c",
+    portrait: "nietzsche",
+    idea: "There are no moral facts — only interpretations. Meaning isn't given; it must be created through self-overcoming. The highest life is one that affirms existence so completely you'd will its eternal return."
+  },
+  {
+    name: "Michel Foucault",
+    years: "1926–1984",
+    tag: "europe",
+    era: "20c",
+    portrait: "foucault",
+    idea: "Power doesn't just repress — it produces. It shapes what counts as knowledge, who gets to speak, and what qualifies as normal. Every institution is a quiet machine for manufacturing certain kinds of people."
+  },
+  {
+    name: "Simone de Beauvoir",
+    years: "1908–1986",
+    tag: "europe",
+    era: "20c",
+    portrait: "beauvoir",
+    idea: "One is not born a woman — one becomes one. Freedom is the fundamental human condition, but it's unevenly distributed. Ethics demands that we fight for others' freedom as fiercely as our own."
+  },
+  {
+    name: "Frantz Fanon",
+    years: "1925–1961",
+    tag: "africa-mideast",
+    era: "20c",
+    portrait: "fanon",
+    idea: "Colonialism doesn't just steal land — it colonizes the mind. The colonized internalize the colonizer's gaze, seeing themselves as lesser. Liberation requires both political revolution and psychological decolonization."
+  },
+  {
+    name: "Gilles Deleuze",
+    years: "1925–1995",
+    tag: "europe",
+    era: "20c",
+    portrait: "deleuze",
+    idea: "Difference is primary — not a deviation from identity, but the generative force behind all things. Thought should be rhizomatic: no center, no hierarchy, just proliferating connections."
+  },
+  {
+    name: "Albert Camus",
+    years: "1913–1960",
+    tag: "europe",
+    era: "20c",
+    portrait: "camus",
+    idea: "The universe is indifferent and life has no inherent meaning — this is the Absurd. But the response isn't despair; it's revolt. One must imagine Sisyphus happy."
+  },
+  {
+    name: "Roland Barthes",
+    years: "1915–1980",
+    tag: "europe",
+    era: "20c",
+    portrait: "barthes",
+    idea: "The author is dead — meaning belongs to the reader, not the writer's intentions. Every text is a tissue of quotations. Culture naturalizes its own myths, making the constructed seem inevitable."
+  },
+  {
+    name: "Jorge Luis Borges",
+    years: "1899–1986",
+    tag: "americas",
+    era: "20c",
+    portrait: "borges",
+    idea: "Reality is a labyrinth of mirrors, and every story contains infinite stories. Time branches, libraries are boundless, and identity dissolves under scrutiny. Fiction isn't escape from reality — it's reality's truest map."
+  },
+  {
+    name: "Fyodor Dostoevsky",
+    years: "1821–1881",
+    tag: "europe",
+    era: "19c",
+    portrait: "dostoevsky",
+    idea: "The human soul is a battlefield between faith and nihilism, pride and humiliation. Suffering isn't a problem to be solved but a crucible where authentic selfhood is forged — or shattered."
+  },
+  {
+    name: "James Baldwin",
+    years: "1924–1987",
+    tag: "americas",
+    era: "20c",
+    portrait: "baldwin",
+    idea: "Love is not sentimental — it's the most dangerous and rigorous enterprise there is. To see another person clearly, you must first confront what you've been trained not to see in yourself."
+  },
+  {
+    name: "Octavia Butler",
+    years: "1947–2006",
+    tag: "americas",
+    era: "20c",
+    portrait: "butler",
+    idea: "Power hierarchies are the deepest human habit — we build them even in utopia. Change is the only constant. The question isn't whether we'll adapt, but whether we'll shape our adaptation consciously."
+  },
+  {
+    name: "Ibn Khaldun",
+    years: "1332–1406",
+    tag: "africa-mideast",
+    era: "medieval",
+    portrait: "khaldun",
+    idea: "Civilizations rise and fall in cycles driven by 'asabiyyah' — group solidarity. Nomadic peoples, bound by cohesion, conquer decadent settled societies, only to grow soft themselves. History has a social physics."
+  },
+  {
+    name: "Zhuangzi",
+    years: "~369–286 BC",
+    tag: "asia",
+    era: "ancient",
+    portrait: "zhuangzi",
+    idea: "How do you know you're not a butterfly dreaming you're a person? Fixed categories dissolve on inspection. The highest wisdom is uselessness — the gnarled tree survives because no one wants to cut it down."
+  },
+  {
+    name: "Rabindranath Tagore",
+    years: "1861–1941",
+    tag: "asia",
+    era: "19c",
+    portrait: "tagore",
+    idea: "Nationalism is a false god — the soul of a civilization lives in its creative spirit, not its borders. Education should awaken joy in living and knowledge, not merely produce efficient workers."
+  },
+  {
+    name: "Kitarō Nishida",
+    years: "1870–1945",
+    tag: "asia",
+    era: "19c",
+    portrait: "nishida",
+    idea: "Pure experience precedes the split between subject and object. Reality isn't something we observe from outside — we are always already within it. Nothingness isn't absence; it's the place where being happens."
+  },
+  // --- AMERICAS additions ---
+  {
+    name: "Sor Juana Inés de la Cruz",
+    years: "1648–1695",
+    tag: "americas",
+    era: "medieval",
+    portrait: "sorjuana",
+    idea: "Women have the same rational souls as men — denying them knowledge is denying their nature. The dream of reason reaches further than any authority permits. True ignorance is not knowing how much one doesn't know."
+  },
+  {
+    name: "Ralph Waldo Emerson",
+    years: "1803–1882",
+    tag: "americas",
+    era: "19c",
+    portrait: "emerson",
+    idea: "Trust thyself — every heart vibrates to that iron string. Nature is the symbol of spirit, and the individual soul partakes of the Oversoul. Society everywhere is in conspiracy against the self-reliance of each of its members."
+  },
+  {
+    name: "W.E.B. Du Bois",
+    years: "1868–1963",
+    tag: "americas",
+    era: "19c",
+    portrait: "dubois",
+    idea: "The color line is the problem of the century. To be Black in America is to live with double consciousness — seeing yourself through your own eyes and through the eyes of a world that looks on in contempt."
+  },
+  {
+    name: "Gloria Anzaldúa",
+    years: "1942–2004",
+    tag: "americas",
+    era: "20c",
+    portrait: "anzaldua",
+    idea: "The borderland is not a line but a living wound — and also a birthplace. Those who inhabit the in-between develop a tolerance for ambiguity that becomes its own kind of mestiza consciousness."
+  },
+  // --- ASIA additions ---
+  {
+    name: "Confucius",
+    years: "~551–479 BC",
+    tag: "asia",
+    era: "ancient",
+    portrait: "confucius",
+    idea: "To govern is to be correct. Virtue radiates outward from the self-cultivated ruler like wind bending grass. Ritual and propriety aren't constraints — they are the grammar through which human goodness becomes legible."
+  },
+  {
+    name: "Dōgen",
+    years: "1200–1253",
+    tag: "asia",
+    era: "medieval",
+    portrait: "dogen",
+    idea: "To study the self is to forget the self. Enlightenment isn't somewhere else — it's the wholehearted practice of this moment. Time doesn't pass; each moment is the entire universe arising and vanishing."
+  },
+  {
+    name: "Nāgārjuna",
+    years: "~150–250",
+    tag: "asia",
+    era: "ancient",
+    portrait: "nagarjuna",
+    idea: "Nothing possesses inherent existence — all things arise in mutual dependence. Emptiness isn't nothingness; it's the radical openness that makes everything possible. Even emptiness itself is empty."
+  },
+  {
+    name: "B.R. Ambedkar",
+    years: "1891–1956",
+    tag: "asia",
+    era: "20c",
+    portrait: "ambedkar",
+    idea: "Political democracy is meaningless without social democracy. Caste is not a wall to be broken but a prison of graded inequality. Liberty, equality, and fraternity must be the foundation, not an afterthought."
+  },
+  // --- AFRICA & MIDDLE EAST additions ---
+  {
+    name: "Ptahhotep",
+    years: "~2400 BC",
+    tag: "africa-mideast",
+    era: "ancient",
+    portrait: "ptahhotep",
+    idea: "Justice is enduring and great, unchanged since the time of its maker. Listen to the humble as well as the great — good speech is rarer than emeralds, yet found among servants at the grindstone."
+  },
+  {
+    name: "Rumi",
+    years: "1207–1273",
+    tag: "africa-mideast",
+    era: "medieval",
+    portrait: "rumi",
+    idea: "The wound is the place where the Light enters you. Love is the bridge between you and everything. Stop acting so small — you are the universe in ecstatic motion, not a drop in the ocean but the ocean in a drop."
+  },
+  {
+    name: "Al-Ghazali",
+    years: "1058–1111",
+    tag: "africa-mideast",
+    era: "medieval",
+    portrait: "ghazali",
+    idea: "The philosophers build castles of logic but cannot reach God through reason alone. True knowledge comes through direct experience — tasting, not theorizing. Doubt is not the enemy of faith; complacency is."
+  },
+  {
+    name: "Chinua Achebe",
+    years: "1930–2013",
+    tag: "africa-mideast",
+    era: "20c",
+    portrait: "achebe",
+    idea: "Until the lions have their own historians, the story of the hunt will always glorify the hunter. The novel is a weapon against the dehumanizing narratives of colonialism — a way to reclaim the complexity of African life."
+  },
+  {
+    name: "Steve Biko",
+    years: "1946–1977",
+    tag: "africa-mideast",
+    era: "20c",
+    portrait: "biko",
+    idea: "The most potent weapon of the oppressor is the mind of the oppressed. Black consciousness isn't about hating the other — it's about the psychological liberation of seeing yourself as fully human, complete and worthy."
+  },
+  {
+    name: "Ngũgĩ wa Thiong'o",
+    years: "1938–",
+    tag: "africa-mideast",
+    era: "20c",
+    portrait: "ngugi",
+    idea: "Language is the carrier of a people's memory and identity. To write in the colonizer's tongue is to continue the colonization of the mind. Decolonizing the mind means returning imagination to its native soil."
+  },
+  // --- NEW ADDITIONS ---
+  {
+    name: "Hannah Arendt",
+    years: "1906–1975",
+    tag: "europe",
+    era: "20c",
+    portrait: "arendt",
+    idea: "Evil is not radical — it is banal, carried out by ordinary people who refuse to think. The public realm is where freedom happens: not in contemplation, but in action and speech among equals."
+  },
+  {
+    name: "Simone Weil",
+    years: "1909–1943",
+    tag: "europe",
+    era: "20c",
+    portrait: "weil",
+    idea: "Gravity drags us toward comfort, power, and self-deception. Grace alone lifts us out. Attention is the rarest form of generosity — to look at the afflicted without flinching is the beginning of justice."
+  },
+  {
+    name: "bell hooks",
+    years: "1952–2021",
+    tag: "americas",
+    era: "20c",
+    portrait: "hooks",
+    idea: "Love is an action, not a feeling — a practice of care, commitment, and accountability. Domination distorts every relationship it touches. The classroom, at its best, is a practice of freedom."
+  },
+  {
+    name: "Murasaki Shikibu",
+    years: "~978–1014",
+    tag: "asia",
+    era: "medieval",
+    portrait: "shikibu",
+    idea: "The human heart is a landscape of shifting attachments and unspoken grief. Fiction reveals what history cannot — the interior life in all its contradiction. Sensitivity to the transient beauty of things is itself a form of wisdom."
+  },
+  {
+    name: "Nawal El Saadawi",
+    years: "1931–2021",
+    tag: "africa-mideast",
+    era: "20c",
+    portrait: "saadawi",
+    idea: "Patriarchy and imperialism are twin structures — you cannot dismantle one while leaving the other intact. The veil over women's minds is more dangerous than any cloth. Resistance begins with naming what has been made invisible."
+  },
+  {
+    name: "Rābiʿa al-ʿAdawiyya",
+    years: "~714–801",
+    tag: "africa-mideast",
+    era: "medieval",
+    portrait: "rabia",
+    idea: "I love God not from fear of hell nor hope of paradise, but for God alone. If love is real, it needs no reward and fears no punishment. The mystic's path is to burn away everything that is not love."
+  },
+  // --- ANCIENT GREEKS ---
+  {
+    name: "Socrates",
+    years: "~470–399 BC",
+    tag: "europe",
+    era: "ancient",
+    portrait: "socrates",
+    idea: "The unexamined life is not worth living. Wisdom begins in knowing that you know nothing. Through relentless questioning, the soul can be drawn toward truths it already dimly recognizes."
+  },
+  {
+    name: "Plato",
+    years: "~428–348 BC",
+    tag: "europe",
+    era: "ancient",
+    portrait: "plato",
+    idea: "What we see are shadows on a cave wall — reality lies in the eternal Forms beyond sense experience. The just soul and the just city mirror each other: reason must govern appetite through the aid of spirited will."
+  },
+  {
+    name: "Aristotle",
+    years: "384–322 BC",
+    tag: "europe",
+    era: "ancient",
+    portrait: "aristotle",
+    idea: "Everything aims at some good. Virtue is not an idea but a habit — the practiced disposition to find the mean between extremes. To understand a thing, ask what it is for: its purpose reveals its nature."
+  },
+  // --- MEDIEVAL EUROPEANS ---
+  {
+    name: "Hildegard of Bingen",
+    years: "1098–1179",
+    tag: "europe",
+    era: "medieval",
+    portrait: "hildegard",
+    idea: "The cosmos is a living web of green, growing force — viriditas — and humanity is its mirror. Visions are not escape from the world but deeper sight into it. The body and soul are one instrument, meant to sing."
+  },
+  {
+    name: "Thomas Aquinas",
+    years: "1225–1274",
+    tag: "europe",
+    era: "medieval",
+    portrait: "aquinas",
+    idea: "Faith and reason are not enemies but two roads to the same truth. Everything that exists has a cause, and the chain of causes points toward a first unmoved mover. Grace does not destroy nature — it perfects it."
+  },
+  {
+    name: "Christine de Pizan",
+    years: "~1364–1430",
+    tag: "europe",
+    era: "medieval",
+    portrait: "pizan",
+    idea: "If women had been allowed to study, they would have achieved as much as men. The City of Ladies is built not on misogynist tradition but on justice, reason, and rectitude. Custom is not truth."
+  },
+  // --- 19C EUROPEANS ---
+  {
+    name: "Mary Wollstonecraft",
+    years: "1759–1797",
+    tag: "europe",
+    era: "19c",
+    portrait: "wollstonecraft",
+    idea: "Women are not naturally inferior — they have been made so by education that cultivates weakness rather than reason. If rights are founded on reason, they cannot belong to one sex alone."
+  },
+  {
+    name: "Karl Marx",
+    years: "1818–1883",
+    tag: "europe",
+    era: "19c",
+    portrait: "marx",
+    idea: "Philosophers have only interpreted the world; the point is to change it. History is the story of class struggle. The economic base shapes law, politics, religion — everything we imagine is freely chosen."
+  },
+  // --- ASIA MEDIEVAL ---
+  {
+    name: "Mirabai",
+    years: "~1498–1546",
+    tag: "asia",
+    era: "medieval",
+    portrait: "mirabai",
+    idea: "Love for the divine shatters every cage — caste, gender, respectability. The poison cup becomes nectar when drunk with devotion. Abandon the fortress of convention; the open road is where God walks."
+  },
+  // --- ASIA 19C ---
+  {
+    name: "Swami Vivekananda",
+    years: "1863–1902",
+    tag: "asia",
+    era: "19c",
+    portrait: "vivekananda",
+    idea: "Each soul is potentially divine. All religions are paths to the same summit — tolerance is not enough; we must accept every faith as true. Arise, awake, and stop not till the goal is reached."
+  },
+  // --- ASIA 20C ---
+  {
+    name: "Gayatri Chakravorty Spivak",
+    years: "1942–",
+    tag: "asia",
+    era: "20c",
+    portrait: "spivak",
+    idea: "Can the subaltern speak? The structures of knowledge production silence the most marginalized before they open their mouths. Representation is never innocent — who speaks for whom is always a political act."
+  },
+  {
+    name: "Keiji Nishitani",
+    years: "1900–1990",
+    tag: "asia",
+    era: "20c",
+    portrait: "nishitani",
+    idea: "Nihilism is not the end but the gateway. When the ground falls away, what remains is śūnyatā — an emptiness more real than any substance. Only by passing through nothingness can the self truly encounter the world."
+  },
+  // --- AFRICA/ME ANCIENT ---
+  {
+    name: "Imhotep",
+    years: "~2650–2600 BC",
+    tag: "africa-mideast",
+    era: "ancient",
+    portrait: "imhotep",
+    idea: "Eat, drink, and be merry, for tomorrow we shall die — but build in stone so that wisdom outlasts any single life. Medicine, architecture, and knowledge are acts of devotion. The learned never truly perish."
+  },
+  {
+    name: "Hypatia",
+    years: "~360–415",
+    tag: "africa-mideast",
+    era: "ancient",
+    portrait: "hypatia",
+    idea: "Reserve your right to think, for even to think wrongly is better than not to think at all. The stars are not mysteries but mathematics. Philosophy is the lantern; superstition and fanaticism are its enemies."
+  },
+  // --- AFRICA/ME 19C ---
+  {
+    name: "Jamāl al-Dīn al-Afghānī",
+    years: "1838–1897",
+    tag: "africa-mideast",
+    era: "19c",
+    portrait: "afghani",
+    idea: "The Islamic world's decline is not due to faith but to its abandonment of reason and science. Unity across Muslim nations is the only defense against imperial domination. Reform must come from within."
+  },
+  {
+    name: "Edward Wilmot Blyden",
+    years: "1832–1912",
+    tag: "africa-mideast",
+    era: "19c",
+    portrait: "blyden",
+    idea: "Africa has its own personality and its own contribution to make to civilization. The African must stop seeing himself through European eyes. Race is not a mark of inferiority but a distinct channel of human genius."
+  },
+  {
+    name: "Nana Asma'u",
+    years: "1793–1864",
+    tag: "africa-mideast",
+    era: "19c",
+    portrait: "asmau",
+    idea: "Educating women is not a deviation from faith but its fulfillment. Knowledge travels through networks of trust — teacher to student, woman to woman, village to village. The pen is an act of devotion."
+  }
+];
+
+const grid = document.getElementById('grid');
+const overlay = document.getElementById('overlay');
+const focusedCardEl = document.getElementById('focusedCard');
+
+function createCardHTML(t) {
+  const portraitSVG = portraits[t.portrait] ? portraits[t.portrait]() : '';
+  return `
+    <div class="card">
+      <div class="card-face card-front">
+        <div class="card-portrait">
+          ${portraitSVG}
+          <div class="silhouette"></div>
+        </div>
+        <div class="card-info">
+          <div class="card-name">${t.name}</div>
+          <div class="card-years">${t.years}</div>
+          <div class="card-tag">${{'europe':'Europe','americas':'Americas','asia':'Asia','africa-mideast':'Africa & Middle East'}[t.tag] || t.tag}</div>
+        </div>
+      </div>
+      <div class="card-face card-back">
+        <div class="back-label">Core Idea</div>
+        <div class="back-idea">${t.idea}</div>
+        <div class="back-name">— ${t.name}</div>
+      </div>
+    </div>
+  `;
+}
+
+// --- DISPLAY ORDER (separate from source data) ---
+let displayOrder = thinkers.map((_, i) => i);
+let currentRegion = 'all';
+let currentEra = 'all';
+
+// --- DRAG STATE ---
+let dragState = null;
+const DRAG_THRESHOLD = 8;
+
+function getFilteredOrder() {
+  return displayOrder.filter(i => {
+    const t = thinkers[i];
+    const regionMatch = currentRegion === 'all' || t.tag === currentRegion;
+    const eraMatch = currentEra === 'all' || t.era === currentEra;
+    return regionMatch && eraMatch;
+  });
+}
+
+function renderGrid(animate = true) {
+  grid.innerHTML = '';
+  const filtered = getFilteredOrder();
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div class="empty-state">No thinkers match these filters</div>';
+    return;
+  }
+  filtered.forEach((thinkerIdx, renderIdx) => {
+    const t = thinkers[thinkerIdx];
+    const container = document.createElement('div');
+    container.className = 'card-container';
+    if (animate) container.style.animationDelay = `${renderIdx * 0.06}s`;
+    else { container.style.opacity = '1'; container.style.transform = 'none'; container.style.animation = 'none'; }
+    container.dataset.thinkerIndex = thinkerIdx;
+    container.innerHTML = createCardHTML(t);
+    grid.appendChild(container);
+  });
+  attachCardListeners();
+}
+
+function attachCardListeners() {
+  grid.querySelectorAll('.card-container').forEach(container => {
+    let clickCount = 0;
+    let clickTimer = null;
+    let startX, startY, wasDragged;
+
+    // --- POINTER DOWN: start tracking ---
+    container.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      if (currentRegion !== 'all' || currentEra !== 'all') return; // only reorder in unfiltered view
+      startX = e.clientX;
+      startY = e.clientY;
+      wasDragged = false;
+
+      const thinkerIdx = parseInt(container.dataset.thinkerIndex);
+      const rect = container.getBoundingClientRect();
+
+      dragState = {
+        sourceIndex: thinkerIdx,
+        sourceEl: container,
+        ghostEl: null,
+        startX: e.clientX,
+        startY: e.clientY,
+        offsetX: e.clientX - rect.left,
+        offsetY: e.clientY - rect.top,
+        width: rect.width,
+        height: rect.height,
+        isDragging: false
+      };
+
+      container.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+
+    // --- POINTER MOVE: maybe start drag ---
+    container.addEventListener('pointermove', (e) => {
+      if (!dragState || dragState.sourceEl !== container) return;
+      const dx = e.clientX - dragState.startX;
+      const dy = e.clientY - dragState.startY;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+
+      if (!dragState.isDragging && dist > DRAG_THRESHOLD) {
+        dragState.isDragging = true;
+        wasDragged = true;
+        startDrag(e);
+      }
+
+      if (dragState.isDragging) {
+        moveDrag(e);
+      }
+    });
+
+    // --- POINTER UP: end drag or handle click ---
+    container.addEventListener('pointerup', (e) => {
+      if (dragState && dragState.isDragging && dragState.sourceEl === container) {
+        endDrag(e);
+        dragState = null;
+        return;
+      }
+      dragState = null;
+
+      if (wasDragged) return; // was a drag attempt, don't fire click
+
+      // Click / double-click logic
+      e.stopPropagation();
+      clickCount++;
+      if (clickCount === 1) {
+        clickTimer = setTimeout(() => {
+          container.querySelector('.card').classList.toggle('flipped');
+          clickCount = 0;
+        }, 250);
+      } else if (clickCount === 2) {
+        clearTimeout(clickTimer);
+        clickCount = 0;
+        openFocused(parseInt(container.dataset.thinkerIndex));
+      }
+    });
+
+    // Cancel on pointer leave without up
+    container.addEventListener('pointercancel', () => {
+      if (dragState && dragState.isDragging) cancelDrag();
+      dragState = null;
+    });
+  });
+}
+
+// --- DRAG FUNCTIONS ---
+
+function startDrag(e) {
+  const { sourceEl, offsetX, offsetY, width, height } = dragState;
+
+  // Create ghost
+  const ghost = document.createElement('div');
+  ghost.className = 'drag-ghost';
+  ghost.style.width = width + 'px';
+  ghost.style.height = height + 'px';
+  ghost.innerHTML = sourceEl.innerHTML;
+  ghost.style.left = (e.clientX - offsetX) + 'px';
+  ghost.style.top = (e.clientY - offsetY) + 'px';
+  document.body.appendChild(ghost);
+  dragState.ghostEl = ghost;
+
+  sourceEl.classList.add('dragging');
+  grid.classList.add('drag-active');
+}
+
+function moveDrag(e) {
+  const { ghostEl, offsetX, offsetY } = dragState;
+  ghostEl.style.left = (e.clientX - offsetX) + 'px';
+  ghostEl.style.top = (e.clientY - offsetY) + 'px';
+
+  // Find drop target
+  clearDropIndicators();
+  const target = getDropTarget(e.clientX, e.clientY);
+  if (target && target.el !== dragState.sourceEl) {
+    target.el.style.position = 'relative';
+    const indicator = document.createElement('div');
+    indicator.className = 'drop-indicator';
+    indicator.style[target.side === 'left' ? 'left' : 'right'] = '-4px';
+    target.el.appendChild(indicator);
+  }
+}
+
+function endDrag(e) {
+  const { sourceEl, ghostEl, sourceIndex } = dragState;
+
+  // Find where to drop
+  const target = getDropTarget(e.clientX, e.clientY);
+
+  if (target && target.el !== sourceEl) {
+    const targetThinkerIdx = parseInt(target.el.dataset.thinkerIndex);
+    // Reorder displayOrder
+    const fromPos = displayOrder.indexOf(sourceIndex);
+    displayOrder.splice(fromPos, 1);
+    let toPos = displayOrder.indexOf(targetThinkerIdx);
+    if (target.side === 'right') toPos++;
+    displayOrder.splice(toPos, 0, sourceIndex);
+    renderGrid(false);
+  }
+
+  cleanupDrag();
+}
+
+function cancelDrag() {
+  cleanupDrag();
+}
+
+function cleanupDrag() {
+  if (dragState && dragState.ghostEl) {
+    dragState.ghostEl.remove();
+  }
+  clearDropIndicators();
+  grid.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+  grid.classList.remove('drag-active');
+}
+
+function clearDropIndicators() {
+  grid.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+}
+
+function getDropTarget(clientX, clientY) {
+  const cards = [...grid.querySelectorAll('.card-container:not(.dragging)')];
+  for (const card of cards) {
+    const rect = card.getBoundingClientRect();
+    if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+      const midX = rect.left + rect.width / 2;
+      return { el: card, side: clientX < midX ? 'left' : 'right' };
+    }
+  }
+  return null;
+}
+
+// --- FOCUS OVERLAY ---
+
+function openFocused(index) {
+  const t = thinkers[index];
+  focusedCardEl.innerHTML = createCardHTML(t);
+  grid.classList.add('dimmed');
+  overlay.style.display = 'flex';
+  requestAnimationFrame(() => overlay.classList.add('visible'));
+
+  focusedCardEl.addEventListener('click', () => {
+    focusedCardEl.querySelector('.card').classList.toggle('flipped');
+  });
+}
+
+function closeFocused() {
+  overlay.classList.remove('visible');
+  grid.classList.remove('dimmed');
+  setTimeout(() => { overlay.style.display = 'none'; }, 350);
+}
+
+overlay.addEventListener('click', (e) => {
+  if (e.target === overlay) closeFocused();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeFocused();
+});
+
+// --- FILTERS ---
+document.querySelectorAll('.genre-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.genre-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentRegion = btn.dataset.filter;
+    renderGrid();
+  });
+});
+
+document.querySelectorAll('.era-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.era-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentEra = btn.dataset.filter;
+    renderGrid();
+  });
+});
+
+renderGrid();
+</script>
+</body>
+</html>
